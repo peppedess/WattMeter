@@ -26,10 +26,10 @@ import com.peppedess.wattmeter.battery.CurrentUnit
 @Composable
 fun SettingsDialog(
     currentUnit: CurrentUnit,
-    autoStart: Boolean,
+    onlyWhileCharging: Boolean,
     dynamicColor: Boolean,
     onUnitChange: (CurrentUnit) -> Unit,
-    onAutoStartChange: (Boolean) -> Unit,
+    onOnlyWhileChargingChange: (Boolean) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onResetRecords: () -> Unit,
     onDismiss: () -> Unit
@@ -87,16 +87,20 @@ fun SettingsDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Avvio automatico",
+                            text = "Solo durante la ricarica",
                             style = MaterialTheme.typography.bodyLarge
                         )
                         Text(
-                            text = "Mostra la notifica live appena colleghi il caricatore",
+                            text = "La notifica compare da sola quando colleghi il caricatore " +
+                                    "e sparisce appena lo togli",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Switch(checked = autoStart, onCheckedChange = onAutoStartChange)
+                    Switch(
+                        checked = onlyWhileCharging,
+                        onCheckedChange = onOnlyWhileChargingChange
+                    )
                 }
 
                 Spacer(Modifier.height(10.dp))

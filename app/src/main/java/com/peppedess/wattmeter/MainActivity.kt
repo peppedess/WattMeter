@@ -100,10 +100,10 @@ private fun AppRoot(
     if (showSettings) {
         SettingsDialog(
             currentUnit = state.currentUnit,
-            autoStart = state.autoStart,
+            onlyWhileCharging = state.onlyWhileCharging,
             dynamicColor = state.dynamicColor,
             onUnitChange = { viewModel.setCurrentUnit(it) },
-            onAutoStartChange = { viewModel.setAutoStart(it) },
+            onOnlyWhileChargingChange = { viewModel.setOnlyWhileCharging(it) },
             onDynamicColorChange = { viewModel.setDynamicColor(it) },
             onResetRecords = { viewModel.resetRecords() },
             onDismiss = { showSettings = false }

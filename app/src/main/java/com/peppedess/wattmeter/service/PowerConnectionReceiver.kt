@@ -6,14 +6,13 @@ import android.content.Intent
 import com.peppedess.wattmeter.battery.Prefs
 
 /**
- * Avvia o ferma la notifica live quando il caricatore viene collegato o scollegato,
- * ma solo se l'utente ha attivato l'opzione nelle impostazioni.
+ * Segue il cavo: alla connessione accende la notifica live, allo scollegamento la spegne.
+ * Attivo solo quando l'utente ha scelto di monitorare la sola ricarica.
  */
 class PowerConnectionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val prefs = Prefs(context)
-        if (!prefs.autoStartOnPlug) return
+        if (!Prefs(context).onlyWhileCharging) return
 
         when (intent.action) {
             Intent.ACTION_POWER_CONNECTED -> MonitorService.start(context)

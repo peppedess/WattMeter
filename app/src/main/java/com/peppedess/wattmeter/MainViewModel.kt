@@ -22,7 +22,7 @@ data class UiState(
     val session: SessionStats = SessionStats(),
     val history: List<Float> = emptyList(),
     val currentUnit: CurrentUnit = CurrentUnit.AUTO,
-    val autoStart: Boolean = false,
+    val onlyWhileCharging: Boolean = true,
     val dynamicColor: Boolean = false,
     val recordPowerW: Float = 0f,
     val recordCurrentMa: Float = 0f,
@@ -41,7 +41,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(
         UiState(
             currentUnit = prefs.currentUnit,
-            autoStart = prefs.autoStartOnPlug,
+            onlyWhileCharging = prefs.onlyWhileCharging,
             dynamicColor = prefs.dynamicColor,
             recordPowerW = prefs.recordPowerW,
             recordCurrentMa = prefs.recordCurrentMa
@@ -81,9 +81,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(currentUnit = unit)
     }
 
-    fun setAutoStart(enabled: Boolean) {
-        prefs.autoStartOnPlug = enabled
-        _state.value = _state.value.copy(autoStart = enabled)
+    fun setOnlyWhileCharging(enabled: Boolean) {
+        prefs.onlyWhileCharging = enabled
+        _state.value = _state.value.copy(onlyWhileCharging = enabled)
     }
 
     fun setDynamicColor(enabled: Boolean) {

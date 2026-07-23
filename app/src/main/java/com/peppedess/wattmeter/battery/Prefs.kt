@@ -15,9 +15,10 @@ class Prefs(context: Context) {
         }.getOrDefault(CurrentUnit.AUTO)
         set(value) = prefs.edit().putString(KEY_UNIT, value.name).apply()
 
-    var autoStartOnPlug: Boolean
-        get() = prefs.getBoolean(KEY_AUTOSTART, false)
-        set(value) = prefs.edit().putBoolean(KEY_AUTOSTART, value).apply()
+    /** La notifica compare al collegamento del caricatore e sparisce quando lo togli. */
+    var onlyWhileCharging: Boolean
+        get() = prefs.getBoolean(KEY_ONLY_CHARGING, true)
+        set(value) = prefs.edit().putBoolean(KEY_ONLY_CHARGING, value).apply()
 
     var recordPowerW: Float
         get() = prefs.getFloat(KEY_RECORD_POWER, 0f)
@@ -52,7 +53,7 @@ class Prefs(context: Context) {
 
     companion object {
         private const val KEY_UNIT = "current_unit"
-        private const val KEY_AUTOSTART = "autostart_on_plug"
+        private const val KEY_ONLY_CHARGING = "only_while_charging"
         private const val KEY_RECORD_POWER = "record_power"
         private const val KEY_RECORD_CURRENT = "record_current"
         private const val KEY_REFRESH = "refresh_ms"

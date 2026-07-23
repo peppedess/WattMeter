@@ -39,6 +39,7 @@ class MonitorService : LifecycleService() {
     private lateinit var monitor: BatteryMonitor
     private lateinit var prefs: Prefs
     private var running = false
+    private var wasCharging = false
 
     override fun onCreate() {
         super.onCreate()
@@ -63,11 +64,20 @@ class MonitorService : LifecycleService() {
         if (!running) {
             running = true
             val first = monitor.read(prefs.currentUnit)
+            wasCharging = first.isCharging
             startForegroundCompat(build(first, ChargeEstimator.estimate(first)))
             lifecycleScope.launch {
                 while (isActive) {
                     val reading = monitor.read(prefs.currentUnit)
                     prefs.updateRecords(reading)
+
+                    // Cavo staccato: se richiesto, sparisce tutto invece di restare appesa
+                    if (wasCharging && !reading.isCharging && prefs.onlyWhileCharging) {
+                        stopSelf()
+                        return@launch
+                    }
+                    wasCharging = reading.isCharging
+
                     notify(build(reading, ChargeEstimator.estimate(reading)))
                     delay(UPDATE_INTERVAL_MS)
                 }
@@ -120,21 +130,22 @@ class MonitorService : LifecycleService() {
             "$level%"
         }
 
-        val segments = if (charging) {
-            listOf(
-                NotificationCompat.ProgressStyle.Segment(80).setColor(COLOR_FAST),
-                NotificationCompat.ProgressStyle.Segment(20).setColor(COLOR_TRICKLE)
-            )
+        // Barra a due tratti: verde fino all'80%, ambra nel tratto finale piu lento
+        val style = if (charging) {
+            NotificationCompat.ProgressStyle()
+                .setProgressSegments(
+                    listOf(
+                        NotificationCompat.ProgressStyle.Segment(80).setColor(COLOR_FAST),
+                        NotificationCompat.ProgressStyle.Segment(20).setColor(COLOR_TRICKLE)
+                    )
+                )
+                .setProgress(level)
+                .setProgressTrackerIcon(
+                    IconCompat.createWithResource(this, R.drawable.ic_notification)
+                )
         } else {
-            listOf(NotificationCompat.ProgressStyle.Segment(100).setColor(COLOR_DRAIN))
+            null
         }
-
-        val style = NotificationCompat.ProgressStyle()
-            .setProgressSegments(segments)
-            .setProgress(level)
-            .setProgressTrackerIcon(
-                IconCompat.createWithResource(this, R.drawable.ic_notification)
-            )
 
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -152,20 +163,30 @@ class MonitorService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(style)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setRequestPromotedOngoing(true)
-            .setShortCriticalText(chip)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(contentIntent)
             .addAction(0, "Ferma", stopIntent)
-            .build()
+
+        if (charging && style != null) {
+            // Live Update: chip in barra di stato, Now Bar su One UI 8, barra di avanzamento
+            builder.setStyle(style)
+                .setRequestPromotedOngoing(true)
+                .setShortCriticalText(chip)
+        } else {
+            // A batteria resta solo una riga discreta nella tendina
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setRequestPromotedOngoing(false)
+                .setSilent(true)
+        }
+
+        return builder.build()
     }
 
     private fun startForegroundCompat(notification: Notification) {
@@ -208,7 +229,6 @@ class MonitorService : LifecycleService() {
 
         private val COLOR_FAST = 0xFF00A050.toInt()
         private val COLOR_TRICKLE = 0xFFE07B00.toInt()
-        private val COLOR_DRAIN = 0xFFE07B00.toInt()
 
         fun start(context: Context) {
             val intent = Intent(context, MonitorService::class.java)
