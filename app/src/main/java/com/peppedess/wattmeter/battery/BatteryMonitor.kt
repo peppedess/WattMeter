@@ -26,15 +26,34 @@ class BatteryMonitor(context: Context) {
     private val currentWindow = ArrayDeque<Float>()
     private var lastFullCapacity: Float? = null
 
-    /** Emette una lettura ogni [intervalMs] millisecondi. */
-    fun readings(intervalMs: Long, unit: () -> CurrentUnit): Flow<BatteryReading> = flow {
+    // Media esponenziale: smorza il rumore del driver senza introdurre ritardi eccessivi
+    private var emaCurrent: Float? = null
+    private var emaVoltage: Float? = null
+    private var lastCharging: Boolean? = null
+
+    /**
+     * Campiona sempre una volta al secondo per alimentare il filtro, ma emette
+     * solo al ritmo richiesto dalla reattivita scelta.
+     */
+    fun readings(
+        unit: () -> CurrentUnit,
+        reactivity: () -> Reactivity
+    ): Flow<BatteryReading> = flow {
+        var tick = 0
         while (true) {
-            emit(read(unit()))
-            delay(intervalMs)
+            val mode = reactivity()
+            val reading = read(unit(), mode.alpha)
+            val every = (mode.uiIntervalMs / SAMPLE_MS).toInt().coerceAtLeast(1)
+            if (tick % every == 0) emit(reading)
+            tick++
+            delay(SAMPLE_MS)
         }
     }
 
-    fun read(unit: CurrentUnit = CurrentUnit.AUTO): BatteryReading {
+    fun read(
+        unit: CurrentUnit = CurrentUnit.AUTO,
+        alpha: Float = 1f
+    ): BatteryReading {
         val intent: Intent? = appContext.registerReceiver(
             null,
             IntentFilter(Intent.ACTION_BATTERY_CHANGED)
@@ -66,16 +85,27 @@ class BatteryMonitor(context: Context) {
         val temperatureC = tempRaw / 10f
 
         val voltageRaw = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
-        val voltageV = normalizeVoltage(voltageRaw)
+        val rawVoltageV = normalizeVoltage(voltageRaw)
 
         val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 (plugged != 0 && status != BatteryManager.BATTERY_STATUS_DISCHARGING)
 
-        val currentMa = normalizeCurrent(
+        val rawCurrentMa = normalizeCurrent(
             raw = safeProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW),
             unit = unit,
             charging = charging
         )
+
+        // Collegando o staccando il cavo il filtro riparte da zero,
+        // altrimenti si trascinerebbe dietro i valori del regime precedente
+        if (lastCharging != null && lastCharging != charging) {
+            emaCurrent = null
+            emaVoltage = null
+            currentWindow.clear()
+        }
+        lastCharging = charging
+
+        val currentMa = smooth(emaCurrent, rawCurrentMa, alpha).also { emaCurrent = it }
 
         val averageRaw = safeProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
         val hardwareAverage = if (averageRaw != null) {
@@ -87,6 +117,7 @@ class BatteryMonitor(context: Context) {
         pushCurrent(currentMa)
         val averageCurrentMa = hardwareAverage ?: movingAverage()
 
+        val voltageV = smooth(emaVoltage, rawVoltageV, alpha).also { emaVoltage = it }
         val powerW = abs(currentMa) / 1000f * voltageV
 
         val chargeCounterRaw = safeProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER)
@@ -144,6 +175,12 @@ class BatteryMonitor(context: Context) {
     private fun readStateOfHealth(): Int? {
         val id = stateOfHealthId ?: return null
         return safeProperty(id)?.takeIf { it in 1..100 }
+    }
+
+    /** Media esponenziale mobile: alpha alto segue, alpha basso stabilizza. */
+    private fun smooth(previous: Float?, value: Float, alpha: Float): Float {
+        if (previous == null || alpha >= 1f) return value
+        return previous + alpha * (value - previous)
     }
 
     private fun safeProperty(id: Int): Int? {
@@ -206,5 +243,6 @@ class BatteryMonitor(context: Context) {
 
     companion object {
         private const val WINDOW_SIZE = 20
+        private const val SAMPLE_MS = 1000L
     }
 }

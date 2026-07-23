@@ -110,6 +110,23 @@ data class BatteryReading(
     }
 }
 
+/**
+ * Quanto in fretta i numeri devono seguire la realta.
+ * Il campionamento resta sempre a un secondo: cambiano il ritmo di aggiornamento
+ * a schermo e il peso del filtro che smorza le oscillazioni del driver.
+ */
+enum class Reactivity(
+    val label: String,
+    val detail: String,
+    val uiIntervalMs: Long,
+    val notificationIntervalMs: Long,
+    val alpha: Float
+) {
+    FLUID("Reattiva", "aggiorna ogni secondo, segue ogni sbalzo", 1000L, 3000L, 0.45f),
+    BALANCED("Equilibrata", "aggiorna ogni 3 secondi, oscillazioni smorzate", 3000L, 6000L, 0.20f),
+    STABLE("Stabile", "aggiorna ogni 6 secondi, valore molto fermo", 6000L, 12000L, 0.10f)
+}
+
 /** Come interpretare il valore grezzo restituito da BATTERY_PROPERTY_CURRENT_NOW. */
 enum class CurrentUnit(val label: String) {
     AUTO("Automatica"),

@@ -22,13 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peppedess.wattmeter.battery.CurrentUnit
+import com.peppedess.wattmeter.battery.Reactivity
 
 @Composable
 fun SettingsDialog(
     currentUnit: CurrentUnit,
+    reactivity: Reactivity,
     onlyWhileCharging: Boolean,
     dynamicColor: Boolean,
     onUnitChange: (CurrentUnit) -> Unit,
+    onReactivityChange: (Reactivity) -> Unit,
     onOnlyWhileChargingChange: (Boolean) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onResetRecords: () -> Unit,
@@ -45,6 +48,47 @@ fun SettingsDialog(
         },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = "Reattività dei valori",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "La corrente letta dal telefono oscilla di suo: qui decidi " +
+                            "quanto smorzarla e ogni quanto aggiornare i numeri.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Column(modifier = Modifier.selectableGroup()) {
+                    Reactivity.entries.forEach { mode ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = mode == reactivity,
+                                onClick = { onReactivityChange(mode) }
+                            )
+                            Column {
+                                Text(
+                                    text = mode.label,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = mode.detail,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
                 Text(
                     text = "Unità della corrente",
                     style = MaterialTheme.typography.titleSmall,

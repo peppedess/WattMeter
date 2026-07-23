@@ -3,6 +3,7 @@ package com.peppedess.wattmeter.battery
 import android.content.Context
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class Prefs(context: Context) {
 
@@ -27,6 +28,12 @@ class Prefs(context: Context) {
     var recordCurrentMa: Float
         get() = prefs.getFloat(KEY_RECORD_CURRENT, 0f)
         set(value) = prefs.edit().putFloat(KEY_RECORD_CURRENT, value).apply()
+
+    var reactivity: Reactivity
+        get() = runCatching {
+            Reactivity.valueOf(prefs.getString(KEY_REACTIVITY, Reactivity.BALANCED.name)!!)
+        }.getOrDefault(Reactivity.BALANCED)
+        set(value) = prefs.edit().putString(KEY_REACTIVITY, value.name).apply()
 
     var dynamicColor: Boolean
         get() = prefs.getBoolean(KEY_DYNAMIC, false)
@@ -58,6 +65,7 @@ class Prefs(context: Context) {
         private const val KEY_RECORD_CURRENT = "record_current"
         private const val KEY_REFRESH = "refresh_ms"
         private const val KEY_DYNAMIC = "dynamic_color"
+        private const val KEY_REACTIVITY = "reactivity"
     }
 }
 
@@ -66,8 +74,8 @@ object Format {
     private val locale = Locale.ITALY
 
     fun watt(value: Float): String = when {
-        abs(value) >= 10f -> String.format(locale, "%.1f", value)
-        else -> String.format(locale, "%.2f", value)
+        abs(value) >= 10f -> String.format(locale, "%.0f", value)
+        else -> String.format(locale, "%.1f", value)
     }
 
     /** Potenza col segno: positiva entra nella batteria, negativa esce. */
@@ -86,7 +94,10 @@ object Format {
 
     fun volt(value: Float): String = String.format(locale, "%.3f V", value)
 
-    fun milliAmp(value: Float): String = String.format(locale, "%.0f mA", value)
+    fun milliAmp(value: Float): String {
+        val rounded = (value / 10f).roundToInt() * 10
+        return String.format(locale, "%d mA", rounded)
+    }
 
     fun celsius(value: Float): String = String.format(locale, "%.1f °C", value)
 

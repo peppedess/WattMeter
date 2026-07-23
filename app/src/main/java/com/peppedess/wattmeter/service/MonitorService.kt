@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -39,7 +41,6 @@ class MonitorService : LifecycleService() {
     private lateinit var monitor: BatteryMonitor
     private lateinit var prefs: Prefs
     private var running = false
-    private var wasCharging = false
 
     override fun onCreate() {
         super.onCreate()
@@ -63,27 +64,33 @@ class MonitorService : LifecycleService() {
 
         if (!running) {
             running = true
-            val first = monitor.read(prefs.currentUnit)
-            wasCharging = first.isCharging
+            val first = monitor.read(prefs.currentUnit, 1f)
             startForegroundCompat(build(first, ChargeEstimator.estimate(first)))
             lifecycleScope.launch {
+                var tick = 0
                 while (isActive) {
-                    val reading = monitor.read(prefs.currentUnit)
+                    val mode = prefs.reactivity
+                    val reading = monitor.read(prefs.currentUnit, mode.alpha)
                     prefs.updateRecords(reading)
 
-                    // Cavo staccato: se richiesto, sparisce tutto invece di restare appesa
-                    if (wasCharging && !reading.isCharging && prefs.onlyWhileCharging) {
+                    // Niente corrente: sparisce tutto invece di restare appesa
+                    if (!reading.isCharging && prefs.onlyWhileCharging) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                         return@launch
                     }
-                    wasCharging = reading.isCharging
 
-                    notify(build(reading, ChargeEstimator.estimate(reading)))
-                    delay(UPDATE_INTERVAL_MS)
+                    // Il filtro si alimenta ogni secondo, la notifica cambia molto piu di rado
+                    val every = (mode.notificationIntervalMs / SAMPLE_MS).toInt().coerceAtLeast(1)
+                    if (tick % every == 0) {
+                        notify(build(reading, ChargeEstimator.estimate(reading)))
+                    }
+                    tick++
+                    delay(SAMPLE_MS)
                 }
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -225,12 +232,30 @@ class MonitorService : LifecycleService() {
         const val CHANNEL_ID = "wattmeter_live"
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.peppedess.wattmeter.STOP"
-        private const val UPDATE_INTERVAL_MS = 2000L
+        private const val SAMPLE_MS = 1000L
 
         private val COLOR_FAST = 0xFF00A050.toInt()
         private val COLOR_TRICKLE = 0xFFE07B00.toInt()
 
+        /** Vero se il caricatore e collegato e sta effettivamente alimentando. */
+        fun isPluggedIn(context: Context): Boolean {
+            val intent = context.registerReceiver(
+                null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            ) ?: return false
+            val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+            val status = intent.getIntExtra(
+                BatteryManager.EXTRA_STATUS,
+                BatteryManager.BATTERY_STATUS_UNKNOWN
+            )
+            return plugged != 0 && status != BatteryManager.BATTERY_STATUS_DISCHARGING
+        }
+
         fun start(context: Context) {
+            // Con "solo durante la ricarica" attivo, a batteria non si avvia nulla:
+            // niente servizio, quindi nessuna notifica di alcun tipo.
+            if (Prefs(context).onlyWhileCharging && !isPluggedIn(context)) return
+
             val intent = Intent(context, MonitorService::class.java)
             runCatching {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

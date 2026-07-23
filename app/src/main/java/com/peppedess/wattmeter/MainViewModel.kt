@@ -9,6 +9,7 @@ import com.peppedess.wattmeter.battery.ChargeEstimate
 import com.peppedess.wattmeter.battery.ChargeEstimator
 import com.peppedess.wattmeter.battery.CurrentUnit
 import com.peppedess.wattmeter.battery.Prefs
+import com.peppedess.wattmeter.battery.Reactivity
 import com.peppedess.wattmeter.battery.SessionStats
 import com.peppedess.wattmeter.battery.SessionTracker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,7 @@ data class UiState(
     val currentUnit: CurrentUnit = CurrentUnit.AUTO,
     val onlyWhileCharging: Boolean = true,
     val dynamicColor: Boolean = false,
+    val reactivity: Reactivity = Reactivity.BALANCED,
     val recordPowerW: Float = 0f,
     val recordCurrentMa: Float = 0f,
     val serviceRunning: Boolean = false,
@@ -43,6 +45,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             currentUnit = prefs.currentUnit,
             onlyWhileCharging = prefs.onlyWhileCharging,
             dynamicColor = prefs.dynamicColor,
+            reactivity = prefs.reactivity,
             recordPowerW = prefs.recordPowerW,
             recordCurrentMa = prefs.recordCurrentMa
         )
@@ -51,8 +54,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            monitor.readings(intervalMs = 1000L, unit = { prefs.currentUnit })
-                .collect { reading -> onReading(reading) }
+            monitor.readings(
+                unit = { prefs.currentUnit },
+                reactivity = { prefs.reactivity }
+            ).collect { reading -> onReading(reading) }
         }
     }
 
@@ -84,6 +89,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setOnlyWhileCharging(enabled: Boolean) {
         prefs.onlyWhileCharging = enabled
         _state.value = _state.value.copy(onlyWhileCharging = enabled)
+    }
+
+    fun setReactivity(value: Reactivity) {
+        prefs.reactivity = value
+        _state.value = _state.value.copy(reactivity = value)
     }
 
     fun setDynamicColor(enabled: Boolean) {

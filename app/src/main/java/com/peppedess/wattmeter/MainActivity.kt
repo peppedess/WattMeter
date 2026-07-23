@@ -13,7 +13,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,6 +25,7 @@ import com.peppedess.wattmeter.ui.HomeScreen
 import com.peppedess.wattmeter.ui.SettingsDialog
 import com.peppedess.wattmeter.ui.theme.WattMeterTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -74,6 +77,8 @@ private fun AppRoot(
 ) {
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -84,14 +89,25 @@ private fun AppRoot(
 
     HomeScreen(
         state = state,
+        snackbarHostState = snackbarHostState,
         onOpenSettings = { showSettings = true },
         onToggleService = {
-            if (MonitorService.isRunning(context)) {
-                MonitorService.stop(context)
-                viewModel.setServiceRunning(false)
-            } else {
-                onRequestService()
-                viewModel.setServiceRunning(true)
+            when {
+                MonitorService.isRunning(context) -> {
+                    MonitorService.stop(context)
+                    viewModel.setServiceRunning(false)
+                }
+                state.onlyWhileCharging && !MonitorService.isPluggedIn(context) -> {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            "Comparira da sola quando colleghi il caricatore"
+                        )
+                    }
+                }
+                else -> {
+                    onRequestService()
+                    viewModel.setServiceRunning(true)
+                }
             }
         },
         onResetSession = { viewModel.resetSession() }
@@ -100,9 +116,11 @@ private fun AppRoot(
     if (showSettings) {
         SettingsDialog(
             currentUnit = state.currentUnit,
+            reactivity = state.reactivity,
             onlyWhileCharging = state.onlyWhileCharging,
             dynamicColor = state.dynamicColor,
             onUnitChange = { viewModel.setCurrentUnit(it) },
+            onReactivityChange = { viewModel.setReactivity(it) },
             onOnlyWhileChargingChange = { viewModel.setOnlyWhileCharging(it) },
             onDynamicColorChange = { viewModel.setDynamicColor(it) },
             onResetRecords = { viewModel.resetRecords() },
