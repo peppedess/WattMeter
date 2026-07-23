@@ -19,10 +19,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peppedess.wattmeter.battery.CurrentUnit
 import com.peppedess.wattmeter.battery.Reactivity
+import com.peppedess.wattmeter.battery.SystemSettings
 
 @Composable
 fun SettingsDialog(
@@ -37,6 +39,8 @@ fun SettingsDialog(
     onResetRecords: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Impostazioni") },
@@ -170,6 +174,31 @@ fun SettingsDialog(
                 }
 
                 Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "Aggiornamenti live",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Il chip nella barra di stato, lo spazio in schermata di blocco " +
+                            "e la Now Bar dipendono da un interruttore di sistema, che puoi " +
+                            "revocare o riattivare quando vuoi.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row {
+                    TextButton(onClick = { SystemSettings.openLiveUpdates(context) }) {
+                        Text("Aggiornamenti live")
+                    }
+                    TextButton(onClick = { SystemSettings.openAppNotifications(context) }) {
+                        Text("Notifiche app")
+                    }
+                }
+
+                Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
 

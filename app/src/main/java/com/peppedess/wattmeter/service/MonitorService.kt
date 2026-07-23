@@ -215,6 +215,11 @@ class MonitorService : LifecycleService() {
 
     private fun createChannel() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Le impostazioni di un canale esistente non sono modificabili da codice:
+        // per alzare l'importanza serve crearne uno nuovo e buttare il vecchio.
+        runCatching { manager.deleteNotificationChannel(OLD_CHANNEL_ID) }
+
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Ricarica live",
@@ -223,13 +228,14 @@ class MonitorService : LifecycleService() {
             description = "Potenza, tempo residuo e avanzamento della ricarica in tempo reale"
             setShowBadge(false)
             enableVibration(false)
-            setSound(null, null)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
     }
 
     companion object {
-        const val CHANNEL_ID = "wattmeter_live"
+        const val CHANNEL_ID = "wattmeter_live_v2"
+        private const val OLD_CHANNEL_ID = "wattmeter_live"
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.peppedess.wattmeter.STOP"
         private const val SAMPLE_MS = 1000L
