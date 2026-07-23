@@ -32,6 +32,7 @@ data class SessionStats(
 data class ChargeEstimate(
     val toFullMs: Long?,
     val toEightyMs: Long?,
+    val toEmptyMs: Long?,
     val remainingMah: Float?,
     val source: String
 )
@@ -102,8 +103,18 @@ object ChargeEstimator {
     private const val TRICKLE_THRESHOLD = 80
 
     fun estimate(reading: BatteryReading): ChargeEstimate {
-        if (!reading.isCharging || reading.isFull) {
-            return ChargeEstimate(null, null, null, "—")
+        if (reading.isFull) {
+            return ChargeEstimate(null, null, null, null, "—")
+        }
+
+        if (!reading.isCharging) {
+            return ChargeEstimate(
+                toFullMs = null,
+                toEightyMs = null,
+                toEmptyMs = estimateAutonomy(reading),
+                remainingMah = reading.chargeCounterMah,
+                source = "Autonomia sul consumo medio"
+            )
         }
 
         val capacity = reading.fullCapacityMah
@@ -121,16 +132,28 @@ object ChargeEstimator {
             return ChargeEstimate(
                 toFullMs = (toFull * 60_000L),
                 toEightyMs = toEighty?.let { it * 60_000L },
+                toEmptyMs = null,
                 remainingMah = remaining,
                 source = "Calcolata sulla corrente media"
             )
         }
 
         reading.systemEtaMs?.let {
-            return ChargeEstimate(it, null, null, "Fornita dal sistema")
+            return ChargeEstimate(it, null, null, null, "Fornita dal sistema")
         }
 
-        return ChargeEstimate(null, null, null, "Dati insufficienti")
+        return ChargeEstimate(null, null, null, null, "Dati insufficienti")
+    }
+
+    /** Tempo residuo a batteria, sul consumo medio recente. */
+    private fun estimateAutonomy(reading: BatteryReading): Long? {
+        val charge = reading.chargeCounterMah ?: return null
+        val drain = abs(reading.averageCurrentMa).takeIf { it > 20f }
+            ?: abs(reading.currentMa).takeIf { it > 20f }
+            ?: return null
+        val hours = charge / drain
+        if (hours <= 0f || hours > 200f) return null
+        return (hours * 3_600_000f).toLong()
     }
 
     private fun weightedMinutes(

@@ -1,6 +1,14 @@
 package com.peppedess.wattmeter.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,41 +18,37 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peppedess.wattmeter.UiState
 import com.peppedess.wattmeter.battery.Format
-import com.peppedess.wattmeter.ui.components.DetailRow
-import com.peppedess.wattmeter.ui.components.MetricRow
-import com.peppedess.wattmeter.ui.components.MetricTile
+import com.peppedess.wattmeter.ui.components.PillRow
 import com.peppedess.wattmeter.ui.components.PowerChart
 import com.peppedess.wattmeter.ui.components.PowerGauge
+import com.peppedess.wattmeter.ui.components.QuietRow
+import com.peppedess.wattmeter.ui.components.StatBlock
+import com.peppedess.wattmeter.ui.components.StatusChip
+import com.peppedess.wattmeter.ui.components.peakOf
+import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     state: UiState,
@@ -52,35 +56,37 @@ fun HomeScreen(
     onToggleService: () -> Unit,
     onResetSession: () -> Unit
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
     val reading = state.reading
     val estimate = state.estimate
     val session = state.session
+    val scheme = MaterialTheme.colorScheme
+
+    val accentTarget = when {
+        reading.isFull -> scheme.primary
+        reading.isCharging && reading.powerW >= 15f -> scheme.primary
+        reading.isCharging -> scheme.tertiary
+        reading.powerW >= 4f -> scheme.error
+        else -> scheme.onSurfaceVariant
+    }
+    val accent by animateColorAsState(accentTarget, tween(600), label = "screenAccent")
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("WattMeter") },
+                title = { Text("WattMeter", fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = onToggleService) {
                         Icon(
                             imageVector = Icons.Filled.Notifications,
                             contentDescription = "Notifica persistente",
-                            tint = if (state.serviceRunning) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            tint = if (state.serviceRunning) accent else scheme.onSurfaceVariant
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Info, contentDescription = "Impostazioni e info")
+                        Icon(Icons.Filled.Info, contentDescription = "Impostazioni")
                     }
-                },
-                scrollBehavior = scrollBehavior
+                }
             )
         }
     ) { innerPadding ->
@@ -88,90 +94,222 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                PowerGauge(
-                    levelPercent = reading.levelPercent,
-                    powerW = reading.powerW,
-                    charging = reading.isCharging,
-                    statusLabel = reading.statusLabel
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    PowerGauge(
+                        levelPercent = reading.levelPercent,
+                        signedPowerW = reading.signedPowerW,
+                        charging = reading.isCharging,
+                        full = reading.isFull
+                    )
+                    StatusChip(text = reading.shortStatus, accent = accent)
+                }
             }
 
             item {
-                LinearWavyProgressIndicator(
-                    progress = { reading.levelPercent / 100f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(12.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge
+                val headline = when {
+                    estimate.toFullMs != null -> Format.duration(estimate.toFullMs)
+                    estimate.toEmptyMs != null -> Format.duration(estimate.toEmptyMs)
+                    else -> null
+                }
+                AnimatedVisibility(
+                    visible = headline != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = if (reading.isCharging) {
-                                "Ricarica ${reading.speedLabel.lowercase()} · ${reading.sourceLabel}"
-                            } else {
-                                reading.sourceLabel
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = Format.duration(estimate.toFullMs),
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = if (estimate.toFullMs != null) {
-                                "al 100% · previsto alle ${
-                                    Format.clockTime(reading.timestamp, estimate.toFullMs)
-                                }"
-                            } else {
-                                "Stima non disponibile"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        if (estimate.toEightyMs != null) {
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                                    alpha = 0.2f
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(30.dp),
+                        color = accent.copy(alpha = 0.13f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = headline ?: "",
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.onSurface
                                 )
+                                Text(
+                                    text = if (estimate.toFullMs != null) {
+                                        "alla carica completa"
+                                    } else {
+                                        "di autonomia"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = scheme.onSurfaceVariant
+                                )
+                            }
+                            if (estimate.toFullMs != null) {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = Format.clockTime(
+                                            reading.timestamp,
+                                            estimate.toFullMs
+                                        ),
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = accent
+                                    )
+                                    if (estimate.toEightyMs != null) {
+                                        Text(
+                                            text = "80% alle ${
+                                                Format.clockTime(
+                                                    reading.timestamp,
+                                                    estimate.toEightyMs
+                                                )
+                                            }",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = scheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    color = scheme.surfaceContainerLow
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "picco ${Format.watt(peakOf(state.history))} W",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = scheme.onSurfaceVariant,
+                                modifier = Modifier.align(Alignment.CenterEnd)
                             )
-                            Spacer(Modifier.height(10.dp))
+                        }
+                        PowerChart(values = state.history, accent = accent)
+                    }
+                }
+            }
+
+            item {
+                PillRow(
+                    items = listOf(
+                        Triple(
+                            Format.number(reading.absCurrentMa, 0),
+                            "mA",
+                            "corrente"
+                        ),
+                        Triple(
+                            Format.number(reading.voltageV, 2),
+                            "V",
+                            "tensione"
+                        ),
+                        Triple(
+                            Format.number(reading.temperatureC, 1),
+                            "°C",
+                            "temperatura"
+                        )
+                    )
+                )
+            }
+
+            item {
+                PillRow(
+                    items = listOf(
+                        Triple(
+                            Format.number(reading.chargeCounterMah ?: 0f, 0),
+                            "mAh",
+                            "residui"
+                        ),
+                        Triple(
+                            Format.number(reading.fullCapacityMah ?: 0f, 0),
+                            "mAh",
+                            "capacità"
+                        ),
+                        Triple(
+                            state.recordPowerW.let { Format.watt(it) },
+                            "W",
+                            "record"
+                        )
+                    )
+                )
+            }
+
+            item {
+                AnimatedVisibility(
+                    visible = session.active,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        color = scheme.surfaceContainerLow
+                    ) {
+                        Column(modifier = Modifier.padding(vertical = 18.dp)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "All'80%",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    text = "Sessione",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Text(
-                                    text = "${Format.duration(estimate.toEightyMs)} · ${
-                                        Format.clockTime(reading.timestamp, estimate.toEightyMs)
-                                    }",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                IconButton(onClick = onResetSession) {
+                                    Icon(
+                                        Icons.Filled.Refresh,
+                                        contentDescription = "Azzera sessione",
+                                        tint = scheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                StatBlock(
+                                    value = Format.duration(session.durationMs),
+                                    label = "durata"
+                                )
+                                StatBlock(
+                                    value = "+${session.gainedPercent}%",
+                                    label = "guadagnati"
+                                )
+                                StatBlock(
+                                    value = Format.wattHour(session.energyWh),
+                                    label = "accumulati"
+                                )
+                            }
+                            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                                QuietRow(
+                                    "Potenza media",
+                                    "${Format.watt(session.averagePowerW)} W"
+                                )
+                                QuietRow(
+                                    "Picco",
+                                    "${Format.watt(session.peakPowerW)} W · ${
+                                        Format.milliAmp(session.peakCurrentMa)
+                                    }"
+                                )
+                                QuietRow(
+                                    "Velocità media",
+                                    Format.percentPerHour(session.percentPerHour)
+                                )
+                                QuietRow(
+                                    "Temperatura massima",
+                                    Format.celsius(session.maxTemperatureC)
                                 )
                             }
                         }
@@ -180,176 +318,30 @@ fun HomeScreen(
             }
 
             item {
-                Card(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge
+                    shape = RoundedCornerShape(28.dp),
+                    color = scheme.surfaceContainerLow
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Potenza · ultimi ${state.history.size} secondi",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        PowerChart(values = state.history)
-                    }
-                }
-            }
-
-            item {
-                MetricRow(
-                    leftLabel = "Corrente",
-                    leftValue = Format.milliAmp(reading.absCurrentMa),
-                    leftHint = "media ${Format.milliAmp(kotlin.math.abs(reading.averageCurrentMa))}",
-                    rightLabel = "Tensione",
-                    rightValue = Format.volt(reading.voltageV),
-                    rightHint = "ai morsetti della cella"
-                )
-            }
-
-            item {
-                MetricRow(
-                    leftLabel = "Temperatura",
-                    leftValue = Format.celsius(reading.temperatureC),
-                    leftHint = temperatureHint(reading.temperatureC),
-                    rightLabel = "Carica residua",
-                    rightValue = Format.mah(reading.chargeCounterMah),
-                    rightHint = "su ${Format.mah(reading.fullCapacityMah)}"
-                )
-            }
-
-            item {
-                MetricRow(
-                    leftLabel = "Da caricare",
-                    leftValue = Format.mah(estimate.remainingMah),
-                    leftHint = "${100 - reading.levelPercent}% mancante",
-                    rightLabel = "Record potenza",
-                    rightValue = "${Format.watt(state.recordPowerW)} W",
-                    rightHint = "picco ${Format.milliAmp(state.recordCurrentMa)}"
-                )
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Sessione di ricarica",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            IconButton(onClick = onResetSession) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Azzera sessione")
-                            }
-                        }
-                        if (!session.active) {
-                            Text(
-                                text = "Collega il caricatore per avviare il conteggio.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            DetailRow("Durata", Format.duration(session.durationMs))
-                            DetailRow(
-                                "Percentuale guadagnata",
-                                "+${session.gainedPercent}% (da ${session.startLevel}%)"
-                            )
-                            DetailRow("Velocità media", Format.percentPerHour(session.percentPerHour))
-                            DetailRow("Energia accumulata", Format.wattHour(session.energyWh))
-                            DetailRow("Potenza media", "${Format.watt(session.averagePowerW)} W")
-                            DetailRow("Potenza di picco", "${Format.watt(session.peakPowerW)} W")
-                            DetailRow("Corrente di picco", Format.milliAmp(session.peakCurrentMa))
-                            DetailRow("Temperatura massima", Format.celsius(session.maxTemperatureC))
-                        }
-                    }
-                }
-            }
-
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "Dettagli batteria",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        DetailRow("Stato", reading.statusLabel)
-                        DetailRow("Alimentazione", reading.sourceLabel)
-                        DetailRow("Salute rilevata", reading.healthLabel)
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                        QuietRow("Salute", reading.healthLabel)
                         reading.stateOfHealthPercent?.let {
-                            DetailRow("Capacità residua nominale", "$it%")
+                            QuietRow("Capacità nominale", "$it%")
                         }
                         reading.cycleCount?.let {
-                            DetailRow("Cicli di carica", it.toString())
+                            QuietRow("Cicli", it.toString())
                         }
-                        DetailRow("Tecnologia", reading.technology)
-                        DetailRow("Capacità stimata", Format.mah(reading.fullCapacityMah))
-                        DetailRow("Metodo di stima", estimate.source)
-                        reading.systemEtaMs?.let {
-                            DetailRow("Stima del sistema", Format.duration(it))
+                        QuietRow("Tecnologia", reading.technology)
+                        if (abs(reading.averageCurrentMa) > 1f) {
+                            QuietRow(
+                                "Corrente media",
+                                Format.milliAmp(abs(reading.averageCurrentMa))
+                            )
                         }
                     }
                 }
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = onToggleService,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            if (state.serviceRunning) "Ferma notifica" else "Notifica live"
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Impostazioni")
-                    }
-                }
-            }
-
-            item {
-                MetricTile(
-                    label = "Nota sulla misura",
-                    value = "Potenza alla batteria",
-                    hint = "Il caricatore eroga il 10-20% in più per perdite di conversione",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
             }
         }
     }
-}
-
-private fun temperatureHint(value: Float): String = when {
-    value >= 43f -> "molto calda"
-    value >= 38f -> "calda"
-    value >= 15f -> "normale"
-    value > 0f -> "fredda"
-    else -> "n/d"
 }

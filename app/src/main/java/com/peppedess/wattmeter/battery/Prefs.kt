@@ -64,6 +64,20 @@ object Format {
         else -> String.format(locale, "%.2f", value)
     }
 
+    /** Potenza col segno: positiva entra nella batteria, negativa esce. */
+    fun signedWatt(value: Float): String {
+        val body = watt(abs(value))
+        return when {
+            abs(value) < 0.005f -> "0"
+            value > 0f -> "+$body"
+            else -> "-$body"
+        }
+    }
+
+    /** Numero puro con i decimali richiesti, per le pill che mostrano l'unità a parte. */
+    fun number(value: Float, decimals: Int): String =
+        String.format(locale, "%.${decimals}f", value)
+
     fun volt(value: Float): String = String.format(locale, "%.3f V", value)
 
     fun milliAmp(value: Float): String = String.format(locale, "%.0f mA", value)

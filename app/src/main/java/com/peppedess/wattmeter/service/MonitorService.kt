@@ -61,11 +61,8 @@ class MonitorService : LifecycleService() {
                     prefs.updateRecords(reading)
                     val estimate = ChargeEstimator.estimate(reading)
 
-                    val title = if (reading.isCharging) {
-                        "${Format.watt(reading.powerW)} W · ${reading.levelPercent}%"
-                    } else {
-                        "${reading.levelPercent}% · ${reading.statusLabel}"
-                    }
+                    val title = "${Format.signedWatt(reading.signedPowerW)} W · " +
+                            "${reading.levelPercent}%"
 
                     val text = buildString {
                         append(Format.milliAmp(reading.absCurrentMa))
@@ -79,6 +76,9 @@ class MonitorService : LifecycleService() {
                             append(" (")
                             append(Format.clockTime(reading.timestamp, estimate.toFullMs))
                             append(")")
+                        } else if (estimate.toEmptyMs != null) {
+                            append("\nAutonomia ")
+                            append(Format.duration(estimate.toEmptyMs))
                         }
                     }
 

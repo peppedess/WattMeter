@@ -36,13 +36,25 @@ data class BatteryReading(
     val absCurrentMa: Float
         get() = abs(currentMa)
 
+    /** Positiva se l'energia entra nella batteria, negativa se esce. */
+    val signedPowerW: Float
+        get() = if (isCharging) powerW else -powerW
+
     val sourceLabel: String
         get() = when (plugged) {
-            BatteryManager.BATTERY_PLUGGED_AC -> "Alimentatore AC"
+            BatteryManager.BATTERY_PLUGGED_AC -> "Alimentatore"
             BatteryManager.BATTERY_PLUGGED_USB -> "USB"
             BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
             4 -> "Dock"
             else -> "Non collegato"
+        }
+
+    /** Riga di stato breve mostrata sotto il quadrante. */
+    val shortStatus: String
+        get() = when {
+            isFull -> "Carica completa"
+            isCharging -> "$speedLabel · $sourceLabel"
+            else -> "A batteria"
         }
 
     val healthLabel: String
@@ -73,7 +85,7 @@ data class BatteryReading(
             powerW >= 12f -> "Rapida"
             powerW >= 6f -> "Standard"
             powerW >= 2f -> "Lenta"
-            else -> "Molto lenta"
+            else -> "Minima"
         }
 
     companion object {

@@ -28,7 +28,19 @@ jobs:
           gradle-version: '8.13'
 
       - name: Build release APK
-        run: gradle assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --console=plain --stacktrace 2>&1 | tee build.log
+
+      - name: Mostra errori di compilazione
+        if: failure()
+        run: |
+          {
+            echo "## Errori di compilazione"
+            echo '~~~'
+            grep -E "^e: " build.log | head -40 || echo "Nessuna riga di errore trovata."
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Rename APK
         run: |

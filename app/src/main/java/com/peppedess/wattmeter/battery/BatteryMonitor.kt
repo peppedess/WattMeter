@@ -130,6 +130,11 @@ class BatteryMonitor(context: Context) {
         )
     }
 
+    /**
+     * La costante BATTERY_PROPERTY_STATE_OF_HEALTH non è presente in tutti gli SDK,
+     * quindi viene risolta a runtime per riflessione: il progetto compila comunque
+     * e il dato compare sui dispositivi che lo espongono.
+     */
     private val stateOfHealthId: Int? by lazy {
         runCatching {
             BatteryManager::class.java.getField("BATTERY_PROPERTY_STATE_OF_HEALTH").getInt(null)

@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 data class UiState(
     val reading: BatteryReading = BatteryReading.EMPTY,
-    val estimate: ChargeEstimate = ChargeEstimate(null, null, null, "—"),
+    val estimate: ChargeEstimate = ChargeEstimate(null, null, null, null, "—"),
     val session: SessionStats = SessionStats(),
     val history: List<Float> = emptyList(),
     val currentUnit: CurrentUnit = CurrentUnit.AUTO,
@@ -58,7 +58,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val session = tracker.update(reading)
         prefs.updateRecords(reading)
 
-        history.addLast(if (reading.isCharging) reading.powerW else -reading.powerW)
+        history.addLast(reading.signedPowerW)
         while (history.size > HISTORY_SIZE) {
             history.removeFirst()
         }
