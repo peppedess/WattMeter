@@ -94,12 +94,7 @@ class BatteryMonitor(context: Context) {
 
         val fullCapacityMah = estimateFullCapacity(chargeCounterMah, level)
 
-        val stateOfHealth = if (Build.VERSION.SDK_INT >= 35) {
-            safeProperty(BatteryManager.BATTERY_PROPERTY_STATE_OF_HEALTH)
-                ?.takeIf { it in 1..100 }
-        } else {
-            null
-        }
+        val stateOfHealth = readStateOfHealth()
 
         val cycleCount = if (Build.VERSION.SDK_INT >= 34) {
             intent?.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1)?.takeIf { it > 0 }
@@ -133,6 +128,17 @@ class BatteryMonitor(context: Context) {
             cycleCount = cycleCount,
             systemEtaMs = systemEta
         )
+    }
+
+    private val stateOfHealthId: Int? by lazy {
+        runCatching {
+            BatteryManager::class.java.getField("BATTERY_PROPERTY_STATE_OF_HEALTH").getInt(null)
+        }.getOrNull()
+    }
+
+    private fun readStateOfHealth(): Int? {
+        val id = stateOfHealthId ?: return null
+        return safeProperty(id)?.takeIf { it in 1..100 }
     }
 
     private fun safeProperty(id: Int): Int? {
