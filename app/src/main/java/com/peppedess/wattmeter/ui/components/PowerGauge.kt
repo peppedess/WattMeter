@@ -28,13 +28,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.peppedess.wattmeter.battery.Format
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -48,17 +48,13 @@ fun PowerGauge(
     signedPowerW: Float,
     charging: Boolean,
     full: Boolean,
+    accentColor: Color,
+    trackColor: Color,
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
-    val target = when {
-        full -> scheme.primary
-        charging && abs(signedPowerW) >= 15f -> scheme.primary
-        charging -> scheme.tertiary
-        abs(signedPowerW) >= 4f -> scheme.error
-        else -> scheme.onSurfaceVariant
-    }
-    val accent by animateColorAsState(target, tween(600), label = "accent")
+    val accent by animateColorAsState(accentColor, tween(600), label = "accent")
+    val track by animateColorAsState(trackColor, tween(600), label = "track")
 
     val level by animateFloatAsState(
         targetValue = levelPercent / 100f,
@@ -85,7 +81,6 @@ fun PowerGauge(
         label = "flowValue"
     )
     val flow = if (charging && !full) flowRaw else -1f
-    val track = scheme.surfaceContainerHighest
 
     Box(
         modifier = modifier

@@ -38,8 +38,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            WattMeterTheme {
+            val viewModel: MainViewModel = viewModel()
+            val state by viewModel.state.collectAsStateWithLifecycle()
+
+            WattMeterTheme(dynamicColor = state.dynamicColor) {
                 AppRoot(
+                    viewModel = viewModel,
+                    state = state,
                     onRequestService = { requestServiceStart() }
                 )
             }
@@ -62,9 +67,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppRoot(onRequestService: () -> Unit) {
-    val viewModel: MainViewModel = viewModel()
-    val state by viewModel.state.collectAsStateWithLifecycle()
+private fun AppRoot(
+    viewModel: MainViewModel,
+    state: UiState,
+    onRequestService: () -> Unit
+) {
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(false) }
 
@@ -94,8 +101,10 @@ private fun AppRoot(onRequestService: () -> Unit) {
         SettingsDialog(
             currentUnit = state.currentUnit,
             autoStart = state.autoStart,
+            dynamicColor = state.dynamicColor,
             onUnitChange = { viewModel.setCurrentUnit(it) },
             onAutoStartChange = { viewModel.setAutoStart(it) },
+            onDynamicColorChange = { viewModel.setDynamicColor(it) },
             onResetRecords = { viewModel.resetRecords() },
             onDismiss = { showSettings = false }
         )

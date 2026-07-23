@@ -1,5 +1,7 @@
 package com.peppedess.wattmeter.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,45 +28,49 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Riquadro compatto: valore grande, unità piccola, etichetta discreta. */
+/** Una metrica con il proprio colore di superficie. */
+@Immutable
+data class PillItem(
+    val value: String,
+    val unit: String,
+    val label: String,
+    val container: Color,
+    val content: Color
+)
+
 @Composable
-fun MetricPill(
-    value: String,
-    unit: String,
-    label: String,
-    modifier: Modifier = Modifier,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface
-) {
+fun MetricPill(item: PillItem, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        shape = RoundedCornerShape(26.dp),
+        color = item.container
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 15.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = value,
-                    fontSize = 21.sp,
+                    text = item.value,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = valueColor,
+                    color = item.content,
                     maxLines = 1
                 )
-                if (unit.isNotEmpty()) {
+                if (item.unit.isNotEmpty()) {
                     Text(
-                        text = unit,
+                        text = item.unit,
                         fontSize = 12.sp,
-                        color = valueColor.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.Medium,
+                        color = item.content.copy(alpha = 0.75f),
                         modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
                     )
                 }
             }
             Text(
-                text = label,
+                text = item.label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = item.content.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -72,65 +80,59 @@ fun MetricPill(
     }
 }
 
-/** Tre pill affiancate a larghezza uguale. */
 @Composable
-fun PillRow(
-    items: List<Triple<String, String, String>>,
-    modifier: Modifier = Modifier
-) {
+fun PillRow(items: List<PillItem>, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items.forEach { (value, unit, label) ->
-            MetricPill(
-                value = value,
-                unit = unit,
-                label = label,
-                modifier = Modifier.weight(1f)
-            )
+        items.forEach { item ->
+            MetricPill(item = item, modifier = Modifier.weight(1f))
         }
     }
 }
 
-/** Etichetta di stato con pallino colorato. */
+/** Etichetta di stato piena, non trasparente: deve saltare all'occhio. */
 @Composable
 fun StatusChip(
     text: String,
-    accent: Color,
+    container: Color,
+    content: Color,
     modifier: Modifier = Modifier
 ) {
+    val bg by animateColorAsState(container, tween(600), label = "chipBg")
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
-        color = accent.copy(alpha = 0.14f)
+        color = bg
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+            modifier = Modifier.padding(start = 14.dp, end = 18.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             Spacer(
                 modifier = Modifier
-                    .size(9.dp)
+                    .size(10.dp)
                     .clip(CircleShape)
-                    .background(accent)
+                    .background(content)
             )
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                fontWeight = FontWeight.Bold,
+                color = content
             )
         }
     }
 }
 
-/** Numero grande con didascalia sotto, per le statistiche di sessione. */
+/** Numero grande con didascalia, per le statistiche di sessione. */
 @Composable
 fun StatBlock(
     value: String,
     label: String,
+    color: Color,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -141,7 +143,7 @@ fun StatBlock(
             text = value,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = color,
             maxLines = 1
         )
         Text(

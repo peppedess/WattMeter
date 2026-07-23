@@ -23,6 +23,7 @@ data class UiState(
     val history: List<Float> = emptyList(),
     val currentUnit: CurrentUnit = CurrentUnit.AUTO,
     val autoStart: Boolean = false,
+    val dynamicColor: Boolean = false,
     val recordPowerW: Float = 0f,
     val recordCurrentMa: Float = 0f,
     val serviceRunning: Boolean = false,
@@ -41,6 +42,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         UiState(
             currentUnit = prefs.currentUnit,
             autoStart = prefs.autoStartOnPlug,
+            dynamicColor = prefs.dynamicColor,
             recordPowerW = prefs.recordPowerW,
             recordCurrentMa = prefs.recordCurrentMa
         )
@@ -82,6 +84,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoStart(enabled: Boolean) {
         prefs.autoStartOnPlug = enabled
         _state.value = _state.value.copy(autoStart = enabled)
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        prefs.dynamicColor = enabled
+        _state.value = _state.value.copy(dynamicColor = enabled)
     }
 
     fun setServiceRunning(running: Boolean) {

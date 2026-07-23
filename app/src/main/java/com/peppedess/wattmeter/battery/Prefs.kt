@@ -27,6 +27,10 @@ class Prefs(context: Context) {
         get() = prefs.getFloat(KEY_RECORD_CURRENT, 0f)
         set(value) = prefs.edit().putFloat(KEY_RECORD_CURRENT, value).apply()
 
+    var dynamicColor: Boolean
+        get() = prefs.getBoolean(KEY_DYNAMIC, false)
+        set(value) = prefs.edit().putBoolean(KEY_DYNAMIC, value).apply()
+
     var refreshMs: Long
         get() = prefs.getLong(KEY_REFRESH, 1000L)
         set(value) = prefs.edit().putLong(KEY_REFRESH, value).apply()
@@ -52,6 +56,7 @@ class Prefs(context: Context) {
         private const val KEY_RECORD_POWER = "record_power"
         private const val KEY_RECORD_CURRENT = "record_current"
         private const val KEY_REFRESH = "refresh_ms"
+        private const val KEY_DYNAMIC = "dynamic_color"
     }
 }
 

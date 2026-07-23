@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.peppedess.wattmeter.UiState
 import com.peppedess.wattmeter.battery.Format
+import com.peppedess.wattmeter.ui.components.PillItem
 import com.peppedess.wattmeter.ui.components.PillRow
 import com.peppedess.wattmeter.ui.components.PowerChart
 import com.peppedess.wattmeter.ui.components.PowerGauge
@@ -46,6 +48,7 @@ import com.peppedess.wattmeter.ui.components.QuietRow
 import com.peppedess.wattmeter.ui.components.StatBlock
 import com.peppedess.wattmeter.ui.components.StatusChip
 import com.peppedess.wattmeter.ui.components.peakOf
+import com.peppedess.wattmeter.ui.theme.energyColors
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,21 +63,39 @@ fun HomeScreen(
     val estimate = state.estimate
     val session = state.session
     val scheme = MaterialTheme.colorScheme
+    val energy = energyColors()
 
+    val charging = reading.isCharging
     val accentTarget = when {
-        reading.isFull -> scheme.primary
-        reading.isCharging && reading.powerW >= 15f -> scheme.primary
-        reading.isCharging -> scheme.tertiary
-        reading.powerW >= 4f -> scheme.error
-        else -> scheme.onSurfaceVariant
+        reading.isFull -> energy.fast
+        charging && reading.powerW >= 12f -> energy.fast
+        charging -> energy.normal
+        else -> energy.drain
     }
-    val accent by animateColorAsState(accentTarget, tween(600), label = "screenAccent")
+    val heroTarget = when {
+        reading.isFull -> energy.fastContainer
+        charging && reading.powerW >= 12f -> energy.fastContainer
+        charging -> energy.normalContainer
+        else -> energy.drainContainer
+    }
+    val accent by animateColorAsState(accentTarget, tween(700), label = "accent")
+    val hero by animateColorAsState(heroTarget, tween(700), label = "hero")
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = scheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("WattMeter", fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Text(
+                        "WattMeter",
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onBackground
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = scheme.background
+                ),
                 actions = {
                     IconButton(onClick = onToggleService) {
                         Icon(
@@ -84,7 +105,11 @@ fun HomeScreen(
                         )
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Filled.Info, contentDescription = "Impostazioni")
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = "Impostazioni",
+                            tint = scheme.onSurfaceVariant
+                        )
                     }
                 }
             )
@@ -98,23 +123,34 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    PowerGauge(
-                        levelPercent = reading.levelPercent,
-                        signedPowerW = reading.signedPowerW,
-                        charging = reading.isCharging,
-                        full = reading.isFull
-                    )
-                    StatusChip(text = reading.shortStatus, accent = accent)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(42.dp),
+                    color = hero
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
+                    ) {
+                        PowerGauge(
+                            levelPercent = reading.levelPercent,
+                            signedPowerW = reading.signedPowerW,
+                            charging = charging,
+                            full = reading.isFull,
+                            accentColor = accent,
+                            trackColor = accent.copy(alpha = 0.18f)
+                        )
+                        StatusChip(
+                            text = reading.shortStatus,
+                            container = accent,
+                            content = scheme.surface
+                        )
+                    }
                 }
             }
 
             item {
-                val headline = when {
-                    estimate.toFullMs != null -> Format.duration(estimate.toFullMs)
-                    estimate.toEmptyMs != null -> Format.duration(estimate.toEmptyMs)
-                    else -> null
-                }
+                val headline = estimate.toFullMs ?: estimate.toEmptyMs
                 AnimatedVisibility(
                     visible = headline != null,
                     enter = fadeIn() + expandVertically(),
@@ -123,7 +159,7 @@ fun HomeScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(30.dp),
-                        color = accent.copy(alpha = 0.13f)
+                        color = scheme.tertiaryContainer
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
@@ -132,10 +168,10 @@ fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = headline ?: "",
+                                    text = Format.duration(headline),
                                     style = MaterialTheme.typography.displaySmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = scheme.onSurface
+                                    color = scheme.onTertiaryContainer
                                 )
                                 Text(
                                     text = if (estimate.toFullMs != null) {
@@ -144,7 +180,7 @@ fun HomeScreen(
                                         "di autonomia"
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = scheme.onSurfaceVariant
+                                    color = scheme.onTertiaryContainer.copy(alpha = 0.8f)
                                 )
                             }
                             if (estimate.toFullMs != null) {
@@ -155,8 +191,8 @@ fun HomeScreen(
                                             estimate.toFullMs
                                         ),
                                         style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = accent
+                                        fontWeight = FontWeight.Bold,
+                                        color = scheme.tertiary
                                     )
                                     if (estimate.toEightyMs != null) {
                                         Text(
@@ -167,7 +203,7 @@ fun HomeScreen(
                                                 )
                                             }",
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = scheme.onSurfaceVariant
+                                            color = scheme.onTertiaryContainer.copy(alpha = 0.75f)
                                         )
                                     }
                                 }
@@ -180,15 +216,16 @@ fun HomeScreen(
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    color = scheme.surfaceContainerLow
+                    shape = RoundedCornerShape(30.dp),
+                    color = scheme.surfaceContainer
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Box(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "picco ${Format.watt(peakOf(state.history))} W",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = scheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accent,
                                 modifier = Modifier.align(Alignment.CenterEnd)
                             )
                         }
@@ -200,20 +237,34 @@ fun HomeScreen(
             item {
                 PillRow(
                     items = listOf(
-                        Triple(
-                            Format.number(reading.absCurrentMa, 0),
-                            "mA",
-                            "corrente"
+                        PillItem(
+                            value = Format.number(reading.absCurrentMa, 0),
+                            unit = "mA",
+                            label = "corrente",
+                            container = scheme.primaryContainer,
+                            content = scheme.onPrimaryContainer
                         ),
-                        Triple(
-                            Format.number(reading.voltageV, 2),
-                            "V",
-                            "tensione"
+                        PillItem(
+                            value = Format.number(reading.voltageV, 2),
+                            unit = "V",
+                            label = "tensione",
+                            container = scheme.secondaryContainer,
+                            content = scheme.onSecondaryContainer
                         ),
-                        Triple(
-                            Format.number(reading.temperatureC, 1),
-                            "°C",
-                            "temperatura"
+                        PillItem(
+                            value = Format.number(reading.temperatureC, 1),
+                            unit = "°C",
+                            label = "temperatura",
+                            container = if (reading.temperatureC >= 40f) {
+                                scheme.errorContainer
+                            } else {
+                                scheme.tertiaryContainer
+                            },
+                            content = if (reading.temperatureC >= 40f) {
+                                scheme.onErrorContainer
+                            } else {
+                                scheme.onTertiaryContainer
+                            }
                         )
                     )
                 )
@@ -222,20 +273,26 @@ fun HomeScreen(
             item {
                 PillRow(
                     items = listOf(
-                        Triple(
-                            Format.number(reading.chargeCounterMah ?: 0f, 0),
-                            "mAh",
-                            "residui"
+                        PillItem(
+                            value = Format.number(reading.chargeCounterMah ?: 0f, 0),
+                            unit = "mAh",
+                            label = "residui",
+                            container = scheme.secondaryContainer,
+                            content = scheme.onSecondaryContainer
                         ),
-                        Triple(
-                            Format.number(reading.fullCapacityMah ?: 0f, 0),
-                            "mAh",
-                            "capacità"
+                        PillItem(
+                            value = Format.number(reading.fullCapacityMah ?: 0f, 0),
+                            unit = "mAh",
+                            label = "capacità",
+                            container = scheme.tertiaryContainer,
+                            content = scheme.onTertiaryContainer
                         ),
-                        Triple(
-                            state.recordPowerW.let { Format.watt(it) },
-                            "W",
-                            "record"
+                        PillItem(
+                            value = Format.watt(state.recordPowerW),
+                            unit = "W",
+                            label = "record",
+                            container = scheme.primaryContainer,
+                            content = scheme.onPrimaryContainer
                         )
                     )
                 )
@@ -249,8 +306,8 @@ fun HomeScreen(
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(28.dp),
-                        color = scheme.surfaceContainerLow
+                        shape = RoundedCornerShape(30.dp),
+                        color = scheme.surfaceContainer
                     ) {
                         Column(modifier = Modifier.padding(vertical = 18.dp)) {
                             Row(
@@ -263,13 +320,13 @@ fun HomeScreen(
                                 Text(
                                     text = "Sessione",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.Bold
                                 )
                                 IconButton(onClick = onResetSession) {
                                     Icon(
                                         Icons.Filled.Refresh,
                                         contentDescription = "Azzera sessione",
-                                        tint = scheme.onSurfaceVariant
+                                        tint = accent
                                     )
                                 }
                             }
@@ -281,18 +338,23 @@ fun HomeScreen(
                             ) {
                                 StatBlock(
                                     value = Format.duration(session.durationMs),
-                                    label = "durata"
+                                    label = "durata",
+                                    color = scheme.onSurface
                                 )
                                 StatBlock(
                                     value = "+${session.gainedPercent}%",
-                                    label = "guadagnati"
+                                    label = "guadagnati",
+                                    color = accent
                                 )
                                 StatBlock(
                                     value = Format.wattHour(session.energyWh),
-                                    label = "accumulati"
+                                    label = "accumulati",
+                                    color = scheme.onSurface
                                 )
                             }
-                            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                            ) {
                                 QuietRow(
                                     "Potenza media",
                                     "${Format.watt(session.averagePowerW)} W"
@@ -320,8 +382,8 @@ fun HomeScreen(
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(28.dp),
-                    color = scheme.surfaceContainerLow
+                    shape = RoundedCornerShape(30.dp),
+                    color = scheme.surfaceContainer
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                         QuietRow("Salute", reading.healthLabel)

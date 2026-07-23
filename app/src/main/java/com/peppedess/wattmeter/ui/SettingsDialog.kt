@@ -27,8 +27,10 @@ import com.peppedess.wattmeter.battery.CurrentUnit
 fun SettingsDialog(
     currentUnit: CurrentUnit,
     autoStart: Boolean,
+    dynamicColor: Boolean,
     onUnitChange: (CurrentUnit) -> Unit,
     onAutoStartChange: (Boolean) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit,
     onResetRecords: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -95,6 +97,28 @@ fun SettingsDialog(
                         )
                     }
                     Switch(checked = autoStart, onCheckedChange = onAutoStartChange)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Colori dallo sfondo",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Sostituisce la palette dell'app con quella estratta " +
+                                    "dal tuo sfondo: se e neutro, l'app diventa grigia",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange)
                 }
 
                 Spacer(Modifier.height(12.dp))
