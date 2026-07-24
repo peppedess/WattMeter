@@ -36,9 +36,24 @@ jobs:
         if: failure()
         run: |
           {
-            echo "## Errori di compilazione"
+            echo "## Causa dell'errore"
             echo '~~~'
-            grep -E "^e: " build.log | head -40 || echo "Nessuna riga di errore trovata."
+            if grep -q "What went wrong" build.log; then
+              sed -n '/What went wrong/,/^\* Try/p' build.log | head -60
+            else
+              echo "Sezione 'What went wrong' non trovata nel log."
+            fi
+            echo '~~~'
+            echo ""
+            echo "## Righe di errore riconosciute"
+            echo '~~~'
+            grep -E -i "^e: |error:|ERROR|Could not (resolve|find)|Manifest merger failed|Execution failed for task|Unresolved reference|Duplicate class" build.log \
+              | sort -u | head -50 || echo "Nessuna riga riconosciuta."
+            echo '~~~'
+            echo ""
+            echo "## Ultime righe del log"
+            echo '~~~'
+            tail -60 build.log
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
 
