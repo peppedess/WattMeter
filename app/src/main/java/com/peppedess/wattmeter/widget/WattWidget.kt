@@ -1,12 +1,14 @@
 package com.peppedess.wattmeter.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -62,13 +64,19 @@ private fun WidgetBody(reading: BatteryReading, estimate: ChargeEstimate) {
         else -> reading.sourceLabel.lowercase()
     }
 
+    val context = LocalContext.current
+
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(sfondo)
             .cornerRadius(24.dp)
             .padding(horizontal = 16.dp, vertical = 12.dp)
-            .clickable(actionStartActivity<MainActivity>()),
+            .clickable(
+                actionStartActivity(
+                    Intent(context, MainActivity::class.java)
+                )
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.Start
     ) {
