@@ -38,6 +38,18 @@
         </service>
 
         <receiver
+            android:name=".widget.WattWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/watt_widget_info" />
+        </receiver>
+
+        <receiver
             android:name=".service.PowerConnectionReceiver"
             android:exported="false">
             <intent-filter>

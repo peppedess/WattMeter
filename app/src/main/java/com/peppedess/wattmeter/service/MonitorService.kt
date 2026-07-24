@@ -25,6 +25,11 @@ import com.peppedess.wattmeter.battery.Format
 import com.peppedess.wattmeter.battery.Alerts
 import com.peppedess.wattmeter.battery.Prefs
 import com.peppedess.wattmeter.battery.SessionTracker
+import com.peppedess.wattmeter.battery.WatchProtocol
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
+import com.peppedess.wattmeter.widget.WattWidget
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -71,6 +76,7 @@ class MonitorService : LifecycleService() {
         if (!running) {
             running = true
             val first = monitor.read(prefs.currentUnit, 1f)
+            pushToWatch(first, ChargeEstimator.estimate(first))
             startForegroundCompat(build(first, ChargeEstimator.estimate(first)))
             lifecycleScope.launch {
                 var tick = 0
@@ -85,6 +91,8 @@ class MonitorService : LifecycleService() {
 
                     // Niente corrente: sparisce tutto invece di restare appesa
                     if (!reading.isCharging && prefs.onlyWhileCharging) {
+                        runCatching { WattWidget().updateAll(this@MonitorService) }
+                        pushToWatch(reading, ChargeEstimator.estimate(reading))
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                         return@launch
@@ -94,6 +102,12 @@ class MonitorService : LifecycleService() {
                     val every = (mode.notificationIntervalMs / SAMPLE_MS).toInt().coerceAtLeast(1)
                     if (tick % every == 0) {
                         notify(build(reading, ChargeEstimator.estimate(reading)))
+                    }
+                    if (tick % WIDGET_EVERY == 0) {
+                        runCatching { WattWidget().updateAll(this@MonitorService) }
+                    }
+                    if (tick % WATCH_EVERY == 0) {
+                        pushToWatch(reading, ChargeEstimator.estimate(reading))
                     }
                     tick++
                     delay(SAMPLE_MS)
@@ -206,6 +220,30 @@ class MonitorService : LifecycleService() {
         return builder.build()
     }
 
+    /** Manda lo stato al Data Layer: l'orologio lo riceve in WatchListenerService. */
+    private fun pushToWatch(reading: BatteryReading, estimate: ChargeEstimate) {
+        val etaLabel = when {
+            estimate.toFullMs != null ->
+                "pieno tra ${Format.duration(estimate.toFullMs)}"
+            estimate.toEmptyMs != null ->
+                "autonomia ${Format.duration(estimate.toEmptyMs)}"
+            reading.isFull -> "carica completa"
+            else -> ""
+        }
+
+        val request = PutDataMapRequest.create(WatchProtocol.PATH).run {
+            dataMap.putInt(WatchProtocol.KEY_LEVEL, reading.levelPercent)
+            dataMap.putFloat(WatchProtocol.KEY_POWER, reading.signedPowerW)
+            dataMap.putString(WatchProtocol.KEY_STATUS, reading.shortStatus)
+            dataMap.putString(WatchProtocol.KEY_ETA, etaLabel)
+            dataMap.putBoolean(WatchProtocol.KEY_CHARGING, reading.isCharging)
+            dataMap.putLong(WatchProtocol.KEY_TIMESTAMP, System.currentTimeMillis())
+            asPutDataRequest()
+        }.setUrgent()
+
+        runCatching { Wearable.getDataClient(this).putDataItem(request) }
+    }
+
     private fun startForegroundCompat(notification: Notification) {
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
@@ -249,6 +287,8 @@ class MonitorService : LifecycleService() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.peppedess.wattmeter.STOP"
         private const val SAMPLE_MS = 1000L
+        private const val WIDGET_EVERY = 10
+        private const val WATCH_EVERY = 3
 
         private val COLOR_FAST = 0xFF00A050.toInt()
         private val COLOR_TRICKLE = 0xFFE07B00.toInt()

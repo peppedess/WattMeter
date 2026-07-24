@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "WattMeter"
 include(":app")
+include(":wear")

@@ -9,12 +9,12 @@ plugins {
 val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 
 android {
-    namespace = "com.peppedess.wattmeter"
+    namespace = "com.peppedess.wattmeter.wear"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.peppedess.wattmeter"
-        minSdk = 26
+        applicationId = "com.peppedess.wattmeter.wear"
+        minSdk = 30
         targetSdk = 36
         versionCode = runNumber
         versionName = "1.0.$runNumber"
@@ -22,7 +22,8 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("wattmeter.jks")
+            // Stesso certificato del telefono: nessun file aggiuntivo nel repo.
+            storeFile = file("../app/wattmeter.jks")
             storePassword = "wattmeter2026"
             keyAlias = "wattmeter"
             keyPassword = "wattmeter2026"
@@ -41,10 +42,6 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
 
@@ -72,21 +69,12 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.activity.compose)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.core)
-    implementation(libs.androidx.glance.appwidget)
-    implementation(libs.play.services.wearable)
+    implementation(libs.androidx.compose.foundation)
 
-    debugImplementation(libs.androidx.ui.tooling)
+    implementation(libs.play.services.wearable)
+    implementation(libs.androidx.wear.ongoing)
 }

@@ -47,6 +47,12 @@ jobs:
           mkdir -p out
           cp app/build/outputs/apk/release/app-release.apk \
              out/WattMeter-v1.0.${{ github.run_number }}.apk
+          if [ -f wear/build/outputs/apk/release/wear-release.apk ]; then
+            cp wear/build/outputs/apk/release/wear-release.apk \
+               out/WattMeter-Watch-v1.0.${{ github.run_number }}.apk
+          else
+            echo "::warning::APK dell'orologio non trovato, pubblico solo quello del telefono"
+          fi
           ls -lh out
 
       - name: Upload artifact
@@ -63,7 +69,8 @@ jobs:
           name: WattMeter v1.0.${{ github.run_number }}
           body: |
             Build automatica dal commit ${{ github.sha }}.
-            Scarica l'APK qui sotto e installalo direttamente dal telefono.
+            Due APK qui sotto: uno per il telefono, uno per il Galaxy Watch
+            (installalo sull'orologio via ADB o il tuo metodo abituale).
           files: out/*.apk
           draft: false
           prerelease: false
