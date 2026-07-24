@@ -22,7 +22,9 @@ import com.peppedess.wattmeter.battery.BatteryReading
 import com.peppedess.wattmeter.battery.ChargeEstimate
 import com.peppedess.wattmeter.battery.ChargeEstimator
 import com.peppedess.wattmeter.battery.Format
+import com.peppedess.wattmeter.battery.Alerts
 import com.peppedess.wattmeter.battery.Prefs
+import com.peppedess.wattmeter.battery.SessionTracker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -40,12 +42,16 @@ class MonitorService : LifecycleService() {
 
     private lateinit var monitor: BatteryMonitor
     private lateinit var prefs: Prefs
+    private lateinit var tracker: SessionTracker
+    private lateinit var alerts: Alerts
     private var running = false
 
     override fun onCreate() {
         super.onCreate()
         monitor = BatteryMonitor(this)
         prefs = Prefs(this)
+        tracker = SessionTracker(this)
+        alerts = Alerts(this)
         createChannel()
     }
 
@@ -72,6 +78,10 @@ class MonitorService : LifecycleService() {
                     val mode = prefs.reactivity
                     val reading = monitor.read(prefs.currentUnit, mode.alpha)
                     prefs.updateRecords(reading)
+
+                    // Archivia la ricarica appena finisce, anche a schermo spento
+                    val session = tracker.update(reading)
+                    alerts.check(reading, session.startTime)
 
                     // Niente corrente: sparisce tutto invece di restare appesa
                     if (!reading.isCharging && prefs.onlyWhileCharging) {

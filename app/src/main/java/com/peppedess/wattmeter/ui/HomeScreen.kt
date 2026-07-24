@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +60,7 @@ fun HomeScreen(
     state: UiState,
     snackbarHostState: SnackbarHostState,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
     onToggleService: () -> Unit,
     onResetSession: () -> Unit
 ) {
@@ -101,6 +103,13 @@ fun HomeScreen(
                     containerColor = scheme.background
                 ),
                 actions = {
+                    IconButton(onClick = onOpenHistory) {
+                        Icon(
+                            Icons.Filled.List,
+                            contentDescription = "Storico ricariche",
+                            tint = scheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = onToggleService) {
                         Icon(
                             imageVector = Icons.Filled.Notifications,

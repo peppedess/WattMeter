@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +22,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.peppedess.wattmeter.service.MonitorService
+import com.peppedess.wattmeter.ui.HistoryScreen
 import com.peppedess.wattmeter.ui.HomeScreen
 import com.peppedess.wattmeter.ui.SettingsDialog
 import com.peppedess.wattmeter.ui.theme.WattMeterTheme
@@ -77,6 +79,7 @@ private fun AppRoot(
 ) {
     val context = LocalContext.current
     var showSettings by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -87,44 +90,65 @@ private fun AppRoot(
         }
     }
 
-    HomeScreen(
-        state = state,
-        snackbarHostState = snackbarHostState,
-        onOpenSettings = { showSettings = true },
-        onToggleService = {
-            when {
-                MonitorService.isRunning(context) -> {
-                    MonitorService.stop(context)
-                    viewModel.setServiceRunning(false)
-                }
-                state.onlyWhileCharging && !MonitorService.isPluggedIn(context) -> {
-                    scope.launch {
-                        snackbarHostState.showSnackbar(
-                            "Comparira da sola quando colleghi il caricatore"
-                        )
+    if (showHistory) {
+        BackHandler { showHistory = false }
+        HistoryScreen(
+            state = state,
+            onBack = { showHistory = false },
+            onClear = { viewModel.clearHistory() }
+        )
+    } else {
+        HomeScreen(
+            state = state,
+            snackbarHostState = snackbarHostState,
+            onOpenSettings = { showSettings = true },
+            onOpenHistory = {
+                viewModel.refreshHistory()
+                showHistory = true
+            },
+            onToggleService = {
+                when {
+                    MonitorService.isRunning(context) -> {
+                        MonitorService.stop(context)
+                        viewModel.setServiceRunning(false)
+                    }
+                    state.onlyWhileCharging && !MonitorService.isPluggedIn(context) -> {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                "Comparira da sola quando colleghi il caricatore"
+                            )
+                        }
+                    }
+                    else -> {
+                        onRequestService()
+                        viewModel.setServiceRunning(true)
                     }
                 }
-                else -> {
-                    onRequestService()
-                    viewModel.setServiceRunning(true)
-                }
-            }
-        },
-        onResetSession = { viewModel.resetSession() }
-    )
-
-    if (showSettings) {
-        SettingsDialog(
-            currentUnit = state.currentUnit,
-            reactivity = state.reactivity,
-            onlyWhileCharging = state.onlyWhileCharging,
-            dynamicColor = state.dynamicColor,
-            onUnitChange = { viewModel.setCurrentUnit(it) },
-            onReactivityChange = { viewModel.setReactivity(it) },
-            onOnlyWhileChargingChange = { viewModel.setOnlyWhileCharging(it) },
-            onDynamicColorChange = { viewModel.setDynamicColor(it) },
-            onResetRecords = { viewModel.resetRecords() },
-            onDismiss = { showSettings = false }
+            },
+            onResetSession = { viewModel.resetSession() }
         )
+
+        if (showSettings) {
+            SettingsDialog(
+                currentUnit = state.currentUnit,
+                reactivity = state.reactivity,
+                onlyWhileCharging = state.onlyWhileCharging,
+                dynamicColor = state.dynamicColor,
+                alertLevelEnabled = state.alertLevelEnabled,
+                alertLevel = state.alertLevel,
+                alertTemperatureEnabled = state.alertTemperatureEnabled,
+                alertTemperature = state.alertTemperature,
+                onUnitChange = { viewModel.setCurrentUnit(it) },
+                onReactivityChange = { viewModel.setReactivity(it) },
+                onOnlyWhileChargingChange = { viewModel.setOnlyWhileCharging(it) },
+                onDynamicColorChange = { viewModel.setDynamicColor(it) },
+                onAlertLevelEnabledChange = { viewModel.setAlertLevelEnabled(it) },
+                onAlertLevelChange = { viewModel.setAlertLevel(it) },
+                onAlertTemperatureEnabledChange = { viewModel.setAlertTemperatureEnabled(it) },
+                onAlertTemperatureChange = { viewModel.setAlertTemperature(it) },
+                onResetRecords = { viewModel.resetRecords() },
+                onDismiss = { showSettings = false }
+            )
+        }
     }
 }

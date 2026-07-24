@@ -29,6 +29,22 @@ class Prefs(context: Context) {
         get() = prefs.getFloat(KEY_RECORD_CURRENT, 0f)
         set(value) = prefs.edit().putFloat(KEY_RECORD_CURRENT, value).apply()
 
+    var alertLevelEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ALERT_LEVEL_ON, false)
+        set(value) = prefs.edit().putBoolean(KEY_ALERT_LEVEL_ON, value).apply()
+
+    var alertLevel: Int
+        get() = prefs.getInt(KEY_ALERT_LEVEL, 80).coerceIn(50, 100)
+        set(value) = prefs.edit().putInt(KEY_ALERT_LEVEL, value.coerceIn(50, 100)).apply()
+
+    var alertTemperatureEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ALERT_TEMP_ON, false)
+        set(value) = prefs.edit().putBoolean(KEY_ALERT_TEMP_ON, value).apply()
+
+    var alertTemperature: Int
+        get() = prefs.getInt(KEY_ALERT_TEMP, 42).coerceIn(35, 50)
+        set(value) = prefs.edit().putInt(KEY_ALERT_TEMP, value.coerceIn(35, 50)).apply()
+
     var reactivity: Reactivity
         get() = runCatching {
             Reactivity.valueOf(prefs.getString(KEY_REACTIVITY, Reactivity.BALANCED.name)!!)
@@ -66,6 +82,10 @@ class Prefs(context: Context) {
         private const val KEY_REFRESH = "refresh_ms"
         private const val KEY_DYNAMIC = "dynamic_color"
         private const val KEY_REACTIVITY = "reactivity"
+        private const val KEY_ALERT_LEVEL_ON = "alert_level_on"
+        private const val KEY_ALERT_LEVEL = "alert_level"
+        private const val KEY_ALERT_TEMP_ON = "alert_temp_on"
+        private const val KEY_ALERT_TEMP = "alert_temp"
     }
 }
 

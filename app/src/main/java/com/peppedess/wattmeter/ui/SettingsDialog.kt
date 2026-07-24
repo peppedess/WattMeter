@@ -13,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.peppedess.wattmeter.battery.CurrentUnit
 import com.peppedess.wattmeter.battery.Reactivity
 import com.peppedess.wattmeter.battery.SystemSettings
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsDialog(
@@ -32,10 +34,18 @@ fun SettingsDialog(
     reactivity: Reactivity,
     onlyWhileCharging: Boolean,
     dynamicColor: Boolean,
+    alertLevelEnabled: Boolean,
+    alertLevel: Int,
+    alertTemperatureEnabled: Boolean,
+    alertTemperature: Int,
     onUnitChange: (CurrentUnit) -> Unit,
     onReactivityChange: (Reactivity) -> Unit,
     onOnlyWhileChargingChange: (Boolean) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onAlertLevelEnabledChange: (Boolean) -> Unit,
+    onAlertLevelChange: (Int) -> Unit,
+    onAlertTemperatureEnabledChange: (Boolean) -> Unit,
+    onAlertTemperatureChange: (Int) -> Unit,
     onResetRecords: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -172,6 +182,70 @@ fun SettingsDialog(
                     }
                     Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange)
                 }
+
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "Avvisi",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Avvisa al $alertLevel%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = alertLevelEnabled,
+                        onCheckedChange = onAlertLevelEnabledChange
+                    )
+                }
+                if (alertLevelEnabled) {
+                    Slider(
+                        value = alertLevel.toFloat(),
+                        onValueChange = { onAlertLevelChange(it.roundToInt()) },
+                        valueRange = 50f..100f,
+                        steps = 9
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Avvisa a $alertTemperature °C",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = alertTemperatureEnabled,
+                        onCheckedChange = onAlertTemperatureEnabledChange
+                    )
+                }
+                if (alertTemperatureEnabled) {
+                    Slider(
+                        value = alertTemperature.toFloat(),
+                        onValueChange = { onAlertTemperatureChange(it.roundToInt()) },
+                        valueRange = 35f..50f,
+                        steps = 14
+                    )
+                }
+                Text(
+                    text = "Ogni avviso arriva una volta sola per ricarica.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider()

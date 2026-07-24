@@ -1,5 +1,6 @@
 package com.peppedess.wattmeter.battery
 
+import android.content.Context
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -37,59 +38,140 @@ data class ChargeEstimate(
     val source: String
 )
 
-class SessionTracker {
+/**
+ * Segue la ricarica in corso e la archivia quando finisce.
+ *
+ * Lo stato vive nelle preferenze, non in memoria: cosi app e servizio vedono
+ * la stessa sessione, che sopravvive alla chiusura dell'app e viene salvata
+ * anche se la ricarica termina a schermo spento.
+ */
+class SessionTracker(context: Context) {
 
-    private var stats = SessionStats()
-    private var lastTimestamp = 0L
-    private var powerSum = 0.0
+    private val appContext = context.applicationContext
+    private val store = appContext.getSharedPreferences("wattmeter_session", Context.MODE_PRIVATE)
+    private val history = SessionHistory(appContext)
 
     fun update(reading: BatteryReading): SessionStats {
+        val active = store.getBoolean(K_ACTIVE, false)
+
         if (!reading.isCharging && !reading.isFull) {
-            if (stats.active) {
-                stats = SessionStats()
-                powerSum = 0.0
-                lastTimestamp = 0L
+            if (active) {
+                archive()
+                clear()
             }
-            return stats
+            return SessionStats()
         }
 
-        if (!stats.active) {
-            stats = SessionStats(
-                active = true,
-                startTime = reading.timestamp,
-                startLevel = reading.levelPercent,
-                currentLevel = reading.levelPercent,
-                maxTemperatureC = reading.temperatureC
-            )
-            powerSum = 0.0
-            lastTimestamp = reading.timestamp
-            return stats
+        if (!active) {
+            begin(reading)
+            return current(reading.levelPercent)
         }
 
-        val deltaMs = (reading.timestamp - lastTimestamp).coerceIn(0L, 60_000L)
-        lastTimestamp = reading.timestamp
+        // Se app e servizio girano insieme, il secondo arrivato non deve
+        // sommare di nuovo lo stesso intervallo
+        val last = store.getLong(K_LAST_TS, 0L)
+        if (reading.timestamp - last < MIN_STEP_MS) {
+            return current(reading.levelPercent)
+        }
 
-        val deltaHours = deltaMs / 3_600_000f
-        powerSum += reading.powerW.toDouble()
-        val samples = stats.samples + 1
-
-        stats = stats.copy(
-            currentLevel = reading.levelPercent,
-            durationMs = reading.timestamp - stats.startTime,
-            energyWh = stats.energyWh + reading.powerW * deltaHours,
-            peakPowerW = max(stats.peakPowerW, reading.powerW),
-            averagePowerW = (powerSum / samples).toFloat(),
-            peakCurrentMa = max(stats.peakCurrentMa, reading.absCurrentMa),
-            maxTemperatureC = max(stats.maxTemperatureC, reading.temperatureC),
-            samples = samples
-        )
-        return stats
+        accumulate(reading, last)
+        return current(reading.levelPercent)
     }
 
     fun reset() {
-        stats = SessionStats()
-        powerSum = 0.0
-        lastTimestamp = 0L
+        clear()
+    }
+
+    private fun begin(reading: BatteryReading) {
+        store.edit()
+            .putBoolean(K_ACTIVE, true)
+            .putLong(K_START, reading.timestamp)
+            .putInt(K_START_LEVEL, reading.levelPercent)
+            .putLong(K_LAST_TS, reading.timestamp)
+            .putFloat(K_ENERGY, 0f)
+            .putFloat(K_PEAK_POWER, reading.powerW)
+            .putFloat(K_PEAK_CURRENT, reading.absCurrentMa)
+            .putFloat(K_MAX_TEMP, reading.temperatureC)
+            .putFloat(K_POWER_SUM, reading.powerW)
+            .putInt(K_SAMPLES, 1)
+            .putString(K_SOURCE, reading.sourceLabel)
+            .apply()
+    }
+
+    private fun accumulate(reading: BatteryReading, last: Long) {
+        val deltaMs = (reading.timestamp - last).coerceIn(0L, 60_000L)
+        val deltaHours = deltaMs / 3_600_000f
+        val samples = store.getInt(K_SAMPLES, 0) + 1
+
+        store.edit()
+            .putLong(K_LAST_TS, reading.timestamp)
+            .putFloat(K_ENERGY, store.getFloat(K_ENERGY, 0f) + reading.powerW * deltaHours)
+            .putFloat(K_PEAK_POWER, max(store.getFloat(K_PEAK_POWER, 0f), reading.powerW))
+            .putFloat(K_PEAK_CURRENT, max(store.getFloat(K_PEAK_CURRENT, 0f), reading.absCurrentMa))
+            .putFloat(K_MAX_TEMP, max(store.getFloat(K_MAX_TEMP, 0f), reading.temperatureC))
+            .putFloat(K_POWER_SUM, store.getFloat(K_POWER_SUM, 0f) + reading.powerW)
+            .putInt(K_SAMPLES, samples)
+            .putInt(K_LEVEL, reading.levelPercent)
+            .apply()
+    }
+
+    private fun current(level: Int): SessionStats {
+        val start = store.getLong(K_START, 0L)
+        val samples = store.getInt(K_SAMPLES, 0).coerceAtLeast(1)
+        return SessionStats(
+            active = true,
+            startTime = start,
+            startLevel = store.getInt(K_START_LEVEL, level),
+            currentLevel = level,
+            durationMs = (store.getLong(K_LAST_TS, start) - start).coerceAtLeast(0L),
+            energyWh = store.getFloat(K_ENERGY, 0f),
+            peakPowerW = store.getFloat(K_PEAK_POWER, 0f),
+            averagePowerW = store.getFloat(K_POWER_SUM, 0f) / samples,
+            peakCurrentMa = store.getFloat(K_PEAK_CURRENT, 0f),
+            maxTemperatureC = store.getFloat(K_MAX_TEMP, 0f),
+            samples = samples
+        )
+    }
+
+    private fun archive() {
+        val start = store.getLong(K_START, 0L)
+        val end = store.getLong(K_LAST_TS, 0L)
+        if (start <= 0L || end <= start) return
+
+        val samples = store.getInt(K_SAMPLES, 0).coerceAtLeast(1)
+        history.add(
+            SessionRecord(
+                startTime = start,
+                endTime = end,
+                startLevel = store.getInt(K_START_LEVEL, 0),
+                endLevel = store.getInt(K_LEVEL, store.getInt(K_START_LEVEL, 0)),
+                energyWh = store.getFloat(K_ENERGY, 0f),
+                peakPowerW = store.getFloat(K_PEAK_POWER, 0f),
+                averagePowerW = store.getFloat(K_POWER_SUM, 0f) / samples,
+                maxTemperatureC = store.getFloat(K_MAX_TEMP, 0f),
+                source = store.getString(K_SOURCE, "—") ?: "—"
+            )
+        )
+    }
+
+    private fun clear() {
+        store.edit().clear().apply()
+    }
+
+    companion object {
+        private const val MIN_STEP_MS = 900L
+        private const val K_ACTIVE = "active"
+        private const val K_START = "start"
+        private const val K_START_LEVEL = "start_level"
+        private const val K_LEVEL = "level"
+        private const val K_LAST_TS = "last_ts"
+        private const val K_ENERGY = "energy"
+        private const val K_PEAK_POWER = "peak_power"
+        private const val K_PEAK_CURRENT = "peak_current"
+        private const val K_MAX_TEMP = "max_temp"
+        private const val K_POWER_SUM = "power_sum"
+        private const val K_SAMPLES = "samples"
+        private const val K_SOURCE = "source"
     }
 }
 
