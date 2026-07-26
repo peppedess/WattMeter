@@ -13,7 +13,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.peppedess.wattmeter.wear"
+        // Deve coincidere ESATTAMENTE con quello del telefono: il Data Layer
+        // riconosce telefono e orologio come la stessa app solo se applicationId
+        // e certificato di firma sono identici. Il namespace resta distinto,
+        // e riguarda solo il codice sorgente, non l'installazione.
+        applicationId = "com.peppedess.wattmeter"
         minSdk = 30
         targetSdk = 36
         versionCode = runNumber
